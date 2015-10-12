@@ -1,0 +1,269 @@
+/*****************************************************
+This program was produced by the
+CodeWizardAVR V2.05.0 Professional
+Automatic Program Generator
+© Copyright 1998-2010 Pavel Haiduc, HP InfoTech s.r.l.
+http://www.hpinfotech.com
+
+Project : 
+Version : 
+Date    : 28.09.2015
+Author  : 
+Company : 
+Comments: 
+
+
+Chip type               : ATtiny85
+AVR Core Clock frequency: 8,000000 MHz
+Memory model            : Small
+External RAM size       : 0
+Data Stack size         : 128
+*****************************************************/
+
+#include <tiny85.h>
+
+#include <delay.h>
+#define abs(_a) (((_a)>=0)?_a:-_a)
+
+#define LED PORTB.2
+#define ADCIN 2
+#define DEAD_VALUE 20
+#define PWM1 PORTB.1
+#define PWM2 PORTB.3
+
+int migMig=0;
+signed int adcTemp=0;
+char adcCount=0;
+signed int adcVal=0;
+signed int pwmVal=0;
+unsigned int setZero=0;
+signed int zero = 385;  //660/6*4/2^(adcTemp >>= 3;)*((if(++adcCount > 6))+1)
+char fl = 0;
+
+
+
+// Timer1 overflow interrupt service routine
+interrupt [TIM1_OVF] void timer1_ovf_isr(void)
+{
+    PWM1 = 1;
+    PWM2 = 1;
+
+}
+
+// Timer1 output compare A interrupt service routine
+interrupt [TIM1_COMPA] void timer1_compa_isr(void)
+{
+// Place your code here
+    if(OCR1A<255) PWM1 = 0;
+}
+
+// Timer1 output compare B interrupt service routine
+interrupt [TIM1_COMPB] void timer1_compb_isr(void)
+{
+// Place your code here
+    if(OCR1B<255) PWM2 = 0;
+}
+
+
+// Timer 0 overflow interrupt service routine
+interrupt [TIM0_OVF] void timer0_ovf_isr(void) //1ms
+{
+// Reinitialize Timer 0 value
+TCNT0=0x83;
+// Place your code here
+    
+    #asm("wdr")
+    LED = 1; 
+    if(++migMig > (600 - (abs(adcVal)))) migMig = 0;
+    
+    //if(setZero < 5000) setZero++;
+   // else
+    { 
+       
+    // -512 < adcVal < 512
+    if(adcVal <= DEAD_VALUE && adcVal >= -DEAD_VALUE)
+    {
+        if(pwmVal>0) pwmVal--;
+        if(pwmVal<0) pwmVal++;  
+         fl = 0;
+    } 
+    else
+    if(adcVal < DEAD_VALUE-zero) 
+    {  
+         LED = 0;
+         pwmVal = 0;
+    }
+    else
+    {
+        if(migMig>100) LED = 0; 
+        
+        if(adcVal > 0)
+        {
+            if(adcVal - DEAD_VALUE > pwmVal && pwmVal < 255){ pwmVal++;  }
+            if(adcVal - DEAD_VALUE < pwmVal && pwmVal > -255){ pwmVal--;  }                      
+        }
+        else
+        {
+            if(adcVal + DEAD_VALUE > pwmVal && pwmVal < 255){ pwmVal++;  }
+            if(adcVal + DEAD_VALUE < pwmVal && pwmVal > -255){ pwmVal--; }
+        }
+    } 
+    
+        if(pwmVal < 0)
+        {
+            if(pwmVal<-140) fl=1;
+           /* if(!fl)*/ OCR1A = 255 + pwmVal;
+            //if(fl) OCR1B = -pwmVal;
+        } 
+        else if(pwmVal > 0) 
+        { 
+            if(pwmVal>140) fl=1;
+            // if(fl) OCR1A = pwmVal; 
+             /*if(!fl)*/ OCR1B = 255 - pwmVal; 
+        }
+        else
+        {
+            OCR1A = 255;
+            OCR1B = 255;
+        }
+    
+    }
+}
+
+
+//Aref
+#define ADC_VREF_TYPE 0x40
+
+// ADC interrupt service routine
+// with auto input scanning
+interrupt [ADC_INT] void adc_isr(void)
+{
+// Read the AD conversion result
+adcTemp += ADCW;
+if(++adcCount > 6)
+{
+    adcTemp >>= 3;
+    if(setZero < 500 && setZero > 495)
+    {
+       // zero = adcTemp;
+    }
+    adcCount=0;
+    adcVal = adcTemp-zero;
+    adcTemp = 0;
+} 
+// Select next ADC input
+ADMUX=(ADCIN | (ADC_VREF_TYPE & 0xff));
+// Delay needed for the stabilization of the ADC input voltage
+delay_us(10);
+// Start the AD conversion
+ADCSRA|=0x40;
+}
+
+
+// Declare your global variables here
+
+void main(void)
+{
+// Declare your local variables here
+
+// Crystal Oscillator division factor: 1
+#pragma optsize-
+CLKPR=0x80;
+CLKPR=0x00;
+#ifdef _OPTIMIZE_SIZE_
+#pragma optsize+
+#endif
+
+// Port B initialization
+// Func5=In Func4=In Func3=Out Func2=Out Func1=Out Func0=In 
+// State5=T State4=T State3=1 State2=1 State1=1 State0=T 
+PORTB=0x0E;
+DDRB=0x0E;
+
+// Timer/Counter 0 initialization
+// Clock source: System Clock
+// Clock value: 125,000 kHz
+// Mode: Normal top=0xFF
+// OC0A output: Disconnected
+// OC0B output: Disconnected
+TCCR0A=0x00;
+TCCR0B=0x03;
+TCNT0=0x83;
+OCR0A=0x00;
+OCR0B=0x00;
+
+// Timer/Counter 1 initialization
+// Clock source: System Clock
+// Clock value: 31,250 kHz
+// Mode: Normal top=0xFF
+// OC1A output: Disconnected
+// OC1B output: Disconnected
+// Timer1 Overflow Interrupt: On
+// Compare A Match Interrupt: On
+// Compare B Match Interrupt: On
+PLLCSR=0x00;
+
+TCCR1=0x09;
+GTCCR=0x00;
+TCNT1=0x00;
+OCR1A=0xFF;
+OCR1B=0xFF;
+OCR1C=0x00;
+
+
+// External Interrupt(s) initialization
+// INT0: Off
+// Interrupt on any change on pins PCINT0-5: Off
+GIMSK=0x00;
+MCUCR=0x00;
+
+// Timer(s)/Counter(s) Interrupt(s) initialization
+TIMSK=0x66;
+
+// Universal Serial Interface initialization
+// Mode: Disabled
+// Clock source: Register & Counter=no clk.
+// USI Counter Overflow Interrupt: Off
+USICR=0x00;
+
+// Analog Comparator initialization
+// Analog Comparator: Off
+ACSR=0x80;
+ADCSRB=0x00;
+DIDR0=0x00;
+
+// ADC initialization
+// ADC Clock frequency: 125,000 kHz
+// ADC Voltage Reference: AREF pin
+// ADC Bipolar Input Mode: Off
+// ADC Reverse Input Polarity: Off
+// ADC Auto Trigger Source: ADC Stopped
+// Digital input buffers on ADC0: On, ADC1: On, ADC2: Off, ADC3: On
+DIDR0&=0x03;
+DIDR0|=0x10 | 0x1;
+
+ADMUX= ADCIN | (ADC_VREF_TYPE & 0xff);
+ADCSRA=0xCE;
+ADCSRB&=0x5F;
+
+
+// Watchdog Timer initialization
+// Watchdog Timer Prescaler: OSC/1024k
+// Watchdog Timer interrupt: Off
+#pragma optsize-
+#asm("wdr")
+WDTCR=0x39;
+WDTCR=0x29;
+#ifdef _OPTIMIZE_SIZE_
+#pragma optsize+
+#endif
+
+// Global enable interrupts
+#asm("sei")
+
+while (1)
+      {
+      // Place your code here
+
+      }
+}

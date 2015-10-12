@@ -1,0 +1,19 @@
+RAM Allocation
+Variable                                                          Address   Size
+--------------------------------------------------------------------------------
+zero                                                              0x00E0       2
+
+EEPROM Allocation
+Variable                                                          Address   Size
+--------------------------------------------------------------------------------
+
+Register Allocation
+Variable                                                          Register  Size
+--------------------------------------------------------------------------------
+migMig                                                            R2,R3        2
+adcTemp                                                           R4,R5        2
+adcCount                                                          R7           1
+adcVal                                                            R8,R9        2
+pwmVal                                                            R10,R11      2
+setZero                                                           R12,R13      2
+fl                                                                R6           1
